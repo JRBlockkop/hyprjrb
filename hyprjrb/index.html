@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HyprJRB</title>
+    <style>
+        body{
+            margin: 0;
+        }
+        #window-bar{
+            height: 26px;
+            background-color: gray;
+            display: flex;
+            flex-direction: row;
+            justify-content: space-between;
+            align-items: center;
+        }
+        #x{
+            width: 20px;
+            height: 20px;
+
+            background-color: red;
+            color: black;
+
+            font-family: system-ui;
+            user-select: none;
+
+            display: flex;
+            flex-direction: row;
+            justify-content: center;
+            align-items: center;
+            margin-right: 3px;
+        }
+    </style>
+</head>
+<body>
+    <div id="window-bar"><span></span><div id="x" onclick="SDL.stack.push('SDL_EVENT_QUIT')">X</div></div>
+    <canvas></canvas>
+    <script>
+        const EventMap = new Map(
+            [
+                ["CreateWindowAndRenderer",(s)=>{SDL.window.title = s.split('|')[2];SDL.window.resize(s.split('|')[0],s.split('|')[1]);}],
+                ["SetRenderDrawColor",(s)=>{SDL.color.set(s.split('|')[0],s.split('|')[1],s.split('|')[2],s.split('|')[3])}],
+                ["RenderClear",(s)=>{ctx.fillStyle = `rgba(${SDL.color.r},${SDL.color.g},${SDL.color.b},${SDL.color.a})`;ctx.fillRect(0,0,SDL.window.w,SDL.window.h)}],
+                ["RenderPresent",()=>{}],
+                ["Delay",()=>{if(SDL.stack.length > 0){ws.send(SDL.stack.pop())}}],
+            ]
+        )
+    </script>
+    <script>
+        const canvas = document.querySelector('canvas');
+        const div = document.getElementById('window-bar');
+        const span = document.querySelector('span');
+        const ws = new WebSocket("http://localhost:53747");
+
+        const ctx = canvas.getContext("2d");
+
+        const SDL = {
+            stack: [],
+            color: {
+                r: 0,
+                g: 0,
+                b: 0,
+                a: 0,
+                set(r,g,b,a){
+                    SDL.color.r = r;
+                    SDL.color.g = g;
+                    SDL.color.b = b;
+                    SDL.color.a = a;
+                }
+            },
+            window: {
+                w: 100,
+                h: 100,
+                title: "",
+                resize(w,h){
+                    SDL.window.w = w;
+                    SDL.window.h = h;
+
+                    span.innerText = SDL.window.title;
+                    div.style.width = `${w}px`;
+
+                    canvas.height = h;
+                    canvas.width = w;
+                }
+            }
+        }
+
+        SDL.window.resize(100,100)
+
+        ws.onmessage = (msg)=>{
+            try{
+                if(msg.data.split("|").length > 1){
+                    EventMap.get(msg.data.split("|")[0])(msg.data.split("|").slice(1).join("|"))
+                }else{
+                    EventMap.get(msg.data.split("|")[0])()
+                }
+            }catch(e){console.log("Error:",e,msg)}
+            
+        } 
+    </script>
+</body>
+</html>

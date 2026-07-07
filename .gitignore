@@ -1,0 +1,3 @@
+*.exe
+hyprjrb/node_modules
+hyprjrb/package-lock.json
