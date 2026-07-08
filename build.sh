@@ -1,1 +1,1 @@
-clear && gcc -D_GNU_SOURCE main.c -o app -lws2_32
+clear && gcc -D_GNU_SOURCE example.c -o app -lws2_32
