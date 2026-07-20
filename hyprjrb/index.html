@@ -41,9 +41,11 @@
         const EventMap = new Map(
             [
                 ["CreateWindowAndRenderer",(s)=>{SDL.window.title = s.split('|')[2];SDL.window.resize(s.split('|')[0],s.split('|')[1]);}],
+                ["SetWindowTitle",(s)=>{SDL.window.title = s.split('|')[0];span.innerText = SDL.window.title}],
                 ["SetRenderDrawColor",(s)=>{SDL.color.set(s.split('|')[0],s.split('|')[1],s.split('|')[2],s.split('|')[3])}],
                 ["RenderClear",(s)=>{ctx.fillStyle = `rgba(${SDL.color.r},${SDL.color.g},${SDL.color.b},${SDL.color.a})`;ctx.fillRect(0,0,SDL.window.w,SDL.window.h)}],
                 ["RenderPresent",()=>{}],
+                ["DestroyWindow",()=>{SDL.window.title = "";SDL.window.resize(0,0)}],
                 ["Delay",()=>{if(SDL.stack.length > 0){ws.send(SDL.stack.pop())}}],
             ]
         )
