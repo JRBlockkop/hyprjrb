@@ -42,15 +42,15 @@ typedef struct
 } SDL_Window;
 typedef struct{} SDL_Renderer;
 typedef struct{int data1,data2;} SDL_WindowEvent;
-typedef enum{SDL_BUTTON_LEFT,SDL_BUTTON_RIGHT} SDL_ButtonType;
-typedef struct{SDL_ButtonType button;int y;} SDL_ButtonEvent;
+typedef enum{SDL_BUTTON_LEFT,SDL_BUTTON_MIDDLE,SDL_BUTTON_RIGHT} SDL_ButtonType;
+typedef struct{SDL_ButtonType button;int x;int y;} SDL_ButtonEvent;
 typedef struct{char* text;} SDL_TextEvent;
 typedef enum{SDLK_BACKSPACE,SDLK_RETURN} SDL_KeyType;
 typedef struct{SDL_KeyType key;} SDL_KeyEvent;
 typedef enum{SDL_EVENT_NONE=0,SDL_EVENT_QUIT,SDL_EVENT_WINDOW_RESIZED,SDL_EVENT_MOUSE_BUTTON_DOWN,SDL_EVENT_TEXT_INPUT,SDL_EVENT_KEY_DOWN} SDL_EventType;
 typedef struct{SDL_EventType type; union{SDL_WindowEvent window;SDL_ButtonEvent button;SDL_TextEvent text;SDL_KeyEvent key;};} SDL_Event;
 typedef struct{int w;int h;int x;int y;} SDL_FRect;
-static SDL_EventType current_event=SDL_EVENT_NONE;
+static SDL_Event current_event={0};
 
 typedef struct {
     unsigned char r;
@@ -59,8 +59,8 @@ typedef struct {
     unsigned char a;
 } SDL_Color;
 
-typedef struct {} SDL_Surface;
-typedef struct {} SDL_Texture;
+typedef struct {char* text;SDL_Color color;} SDL_Surface;
+typedef struct {SDL_Surface surface;} SDL_Texture;
 
 static char* string_printf(const char *fmt,...){
  va_list a,b; va_start(a,fmt); va_copy(b,a); int n=vsnprintf(NULL,0,fmt,a); va_end(a);
@@ -123,39 +123,113 @@ static inline char* SDL_GetError(){return "Lol hyprjrb!";}
 static inline int SDL_CreateWindowAndRenderer(const char*t,int w,int h,const char*fl,SDL_Window**win,SDL_Renderer**ren){(void)fl;(void)win;(void)ren;char*s=string_printf("CreateWindowAndRenderer|%d|%d|%s",w,h,t); if(!s)return 0; udp_request(s,1); free(s); return 1;}
 static inline void SDL_SetWindowTitle(SDL_Window*win,const char*t){(void)win;char*s=string_printf("SetWindowTitle|%s",t); udp_request(s,1); free(s);}
 
-static inline SDL_Texture* SDL_CreateTextureFromSurface(SDL_Renderer*r,SDL_Surface*s){(void)r;(void)s;SDL_Texture *t;return t;}
-static inline void SDL_GetTextureSize(SDL_Texture*t,float *w,float *h){(void)t;(void)w;(void)h;}
+static inline SDL_Texture* SDL_CreateTextureFromSurface(SDL_Renderer*r,SDL_Surface*s){(void)r;(void)s;SDL_Texture *t = malloc(sizeof(SDL_Texture));t->surface = *s;return t;}
+static inline void SDL_GetTextureSize(SDL_Texture*t,float *w,float *h){(void)t;(void)h;*w = 100.0f;}
 
 static inline int SDL_SetRenderDrawColor(SDL_Renderer*r,int R,int G,int B,int A){(void)r;char*s=string_printf("SetRenderDrawColor|%d|%d|%d|%d",R,G,B,A); if(!s)return 0; udp_request(s,1); free(s); return 1;}
 
 static inline void SDL_RenderClear(SDL_Renderer*r){(void)r;udp_request("RenderClear",1);}
-static inline void SDL_RenderFillRect(SDL_Renderer*r,SDL_FRect*f){(void)r;(void)f;}
-static inline void SDL_RenderTexture(SDL_Renderer*r,SDL_Texture*t,const SDL_FRect *src,SDL_FRect *dst){(void)r;(void)t;(void)src;(void)dst;}
+static inline void SDL_RenderFillRect(SDL_Renderer*r,SDL_FRect*f){(void)r;char*s=string_printf("RenderFillRect|%d|%d|%d|%d",f->x,f->y,f->w,f->h);udp_request(s,1);(void)f;}
+static inline void SDL_RenderTexture(SDL_Renderer*r,SDL_Texture*t,const SDL_FRect *src,SDL_FRect *dst){(void)r;(void)src;char*s=string_printf("RenderTexture|%d|%d|%d|%d|%d|%d|%d|%d|%s",dst->x,dst->y,dst->w,dst->h,t->surface.color.r,t->surface.color.g,t->surface.color.b,t->surface.color.a,t->surface.text);udp_request(s,1); free(s);}
 static inline void SDL_RenderPresent(SDL_Renderer*r){(void)r;udp_request("RenderPresent",1);}
 
 static inline int SDL_PollEvent(SDL_Event*e){
-    if(current_event!=SDL_EVENT_NONE){
-        e->type=current_event;current_event=SDL_EVENT_NONE;
+    if(current_event.type!=SDL_EVENT_NONE){
+        e->type=current_event.type;
+        if(current_event.type == SDL_EVENT_MOUSE_BUTTON_DOWN)
+            e->button = current_event.button;
+        if(current_event.type == SDL_EVENT_TEXT_INPUT)
+            e->text = current_event.text;
+        current_event.type=SDL_EVENT_NONE;
         return 1;
     }
     return 0;
 }
 static inline void SDL_Delay(int ms){
-    char*res=udp_request("Delay",ms);
-    if(!res){
-        current_event=SDL_EVENT_NONE;
+    char *res = udp_request("Delay", ms);
+    
+    if (!res) {
+        current_event.type = SDL_EVENT_NONE;
         return;
     }
-    if(!strcmp(res,"SDL_EVENT_QUIT"))
-        current_event=SDL_EVENT_QUIT;
-    if(!strcmp(res,"SDL_EVENT_WINDOW_RESIZED"))
-        current_event=SDL_EVENT_WINDOW_RESIZED;
+    
+    char *event = strtok(res, "|");
+    
+    if (!event) {
+        free(res);
+        return;
+    }
+    
+    if (!strcmp(event, "SDL_EVENT_QUIT")) {
+        current_event.type = SDL_EVENT_QUIT;
+    }
+    else if (!strcmp(event, "SDL_EVENT_WINDOW_RESIZED")) {
+        current_event.type = SDL_EVENT_WINDOW_RESIZED;
+    }
+    else if (!strcmp(event, "SDL_EVENT_TEXT_INPUT")) {
+        current_event.type = SDL_EVENT_TEXT_INPUT;
+        char *text = strtok(NULL, "|");
+        
+        SDL_TextEvent te = {0};
+
+        te.text = text;
+
+        current_event.text = te;
+
+    }
+    else if (!strcmp(event, "SDL_EVENT_KEY_DOWN")) {
+        current_event.type = SDL_EVENT_KEY_DOWN;
+
+        char *key = strtok(NULL, "|");
+
+        SDL_KeyEvent ke = {0};
+
+        if(!strcmp(key, "Enter")){
+            ke.key = SDLK_RETURN;
+            current_event.key = ke;
+        }
+        if(!strcmp(key, "Backspace")){
+            ke.key = SDLK_BACKSPACE;
+            current_event.key = ke;
+        }
+        
+
+    }
+    else if (!strcmp(event, "SDL_EVENT_MOUSE_BUTTON_DOWN")) {
+        current_event.type = SDL_EVENT_MOUSE_BUTTON_DOWN;
+
+        char *button = strtok(NULL, "|");
+        char *x = strtok(NULL, "|");
+        char *y = strtok(NULL, "|");
+
+        SDL_ButtonEvent be = {0};
+
+        if(!strcmp(button, "SDL_BUTTON_LEFT"))
+            be.button = SDL_BUTTON_LEFT;
+
+        if(!strcmp(button, "SDL_BUTTON_MIDDLE"))
+            be.button = SDL_BUTTON_LEFT;
+
+        if(!strcmp(button, "SDL_BUTTON_RIGHT"))
+            be.button = SDL_BUTTON_LEFT;
+
+        be.x = atoi(x);
+        be.y = atoi(y);
+
+        current_event.button = be;
+    }
+    
     free(res);
 }
 static inline void SDL_StartTextInput(SDL_Window*w){(void)w;udp_request("StartTextInput",1);}
 static inline void SDL_StopTextInput(SDL_Window*w){(void)w;udp_request("StopTextInput",1);}
 static inline void SDL_DestroyWindow(SDL_Window*w){(void)w;udp_request("DestroyWindow",1);}
 static inline void SDL_DestroyRenderer(SDL_Renderer*r){(void)r;}
-static inline void SDL_DestroySurface(SDL_Surface*s){(void)s;}
+static inline void SDL_DestroySurface(SDL_Surface*s){
+    if (!s)
+        return;
+
+    free(s);
+}
 static inline void SDL_Quit(){}
 #endif

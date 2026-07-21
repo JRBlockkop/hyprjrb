@@ -35,7 +35,7 @@
     </style>
 </head>
 <body>
-    <div id="window-bar"><span></span><div id="x" onclick="SDL.stack.push('SDL_EVENT_QUIT')">X</div></div>
+    <div id="window-bar"><span></span><div id="x">X</div></div>
     <canvas></canvas>
     <script>
         const EventMap = new Map(
@@ -44,7 +44,11 @@
                 ["SetWindowTitle",(s)=>{SDL.window.title = s.split('|')[0];span.innerText = SDL.window.title}],
                 ["SetRenderDrawColor",(s)=>{SDL.color.set(s.split('|')[0],s.split('|')[1],s.split('|')[2],s.split('|')[3])}],
                 ["RenderClear",(s)=>{ctx.fillStyle = `rgba(${SDL.color.r},${SDL.color.g},${SDL.color.b},${SDL.color.a})`;ctx.fillRect(0,0,SDL.window.w,SDL.window.h)}],
+                ["StartTextInput",()=>{}],
+                ["StopTextInput",()=>{}],
                 ["RenderPresent",()=>{}],
+                ["RenderTexture",(s)=>{ctx.font = "30px Arial";ctx.fillStyle = `rgba(${s.split('|')[4]},${s.split('|')[5]},${s.split('|')[6]},${s.split('|')[7]})`;ctx.fillText(s.split('|').slice(8).join("|"), s.split('|')[2], 3+s.split('|')[3]);}],
+                ["RenderFillRect",(s)=>{ctx.fillStyle = `rgba(${SDL.color.r},${SDL.color.g},${SDL.color.b},${SDL.color.a})`;ctx.fillRect(s.split('|')[0],s.split('|')[1],s.split('|')[2],s.split('|')[3])}],
                 ["DestroyWindow",()=>{SDL.window.title = "";SDL.window.resize(0,0)}],
                 ["Delay",()=>{if(SDL.stack.length > 0){ws.send(SDL.stack.pop())}}],
             ]
@@ -53,6 +57,7 @@
     <script>
         const canvas = document.querySelector('canvas');
         const div = document.getElementById('window-bar');
+        const x = document.getElementById('x');
         const span = document.querySelector('span');
         const ws = new WebSocket("http://localhost:53747");
 
@@ -100,7 +105,42 @@
                 }
             }catch(e){console.log("Error:",e,msg)}
             
-        } 
+        }
+
+        //Listeners
+        x.addEventListener('click',(e)=>{
+            SDL.stack.push('SDL_EVENT_QUIT')
+        })
+        canvas.addEventListener("mousedown", (event) => {
+            let button;
+
+            switch (event.button) {
+                case 0:
+                    button = "SDL_BUTTON_LEFT";
+                    break;
+                case 1:
+                    button = "SDL_BUTTON_MIDDLE";
+                    break;
+                case 2:
+                    button = "SDL_BUTTON_RIGHT";
+                    break;
+                default:
+                    return;
+            }
+            const rect = canvas.getBoundingClientRect();
+
+            const x = Math.floor(event.clientX - rect.left);
+            const y = Math.floor(event.clientY - rect.top);
+
+            SDL.stack.push(`SDL_EVENT_MOUSE_BUTTON_DOWN|${button}|${x}|${y}`);
+        });
+        document.body.addEventListener("keydown", (event) => {
+            if(event.key.length==1){
+                SDL.stack.push(`SDL_EVENT_TEXT_INPUT|${event.key}`);
+            }else{
+                SDL.stack.push(`SDL_EVENT_KEY_DOWN|${event.key}`);
+            }
+        })
     </script>
 </body>
 </html>
